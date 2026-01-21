@@ -1,0 +1,316 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free Kitchen - AI Gourmet Recipe Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-color: #0a0a0a;
+            --accent-color: #ffffff;
+            --card-bg: rgba(255, 255, 255, 0.03);
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: var(--bg-color);
+            color: #e5e5e5;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .decoration-svg {
+            position: fixed;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.1;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 28px;
+        }
+
+        .recipe-card {
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        .recipe-card:hover {
+            transform: translateY(-6px);
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        .loading-spinner {
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top: 2px solid var(--accent-color);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .image-container {
+            width: 100%;
+            aspect-ratio: 1/1;
+            background: rgba(255,255,255,0.02);
+            border-radius: 20px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        @media (min-width: 640px) {
+            .image-container {
+                width: 180px;
+                height: 180px;
+            }
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+        input, select {
+            outline: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <svg class="decoration-svg" style="top: 10%; left: -5%; width: 300px;" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50 50 Q50 10 70 30 T50 50 Q90 50 70 70 T50 50 Q50 90 30 70 T50 50 Q10 50 30 30 T50 50" fill="white" />
+    </svg>
+    <svg class="decoration-svg" style="bottom: 5%; right: -5%; width: 400px;" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50 50 Q50 10 70 30 T50 50 Q90 50 70 70 T50 50 Q50 90 30 70 T50 50 Q10 50 30 30 T50 50" fill="white" />
+    </svg>
+
+    <div class="relative z-10 max-w-6xl mx-auto px-6 py-16">
+        <header class="text-center mb-16">
+            <h1 class="text-6xl md:text-8xl font-bold tracking-tighter mb-6 text-white">Free Kitchen</h1>
+            <p class="text-gray-500 font-light tracking-[0.4em] uppercase text-[10px] md:text-xs">Next-Gen AI Culinary Experience</p>
+        </header>
+
+        <main class="glass-card p-8 md:p-12 mb-16 shadow-2xl transition-all border-white/10">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] font-bold text-gray-400 mb-3 uppercase tracking-[0.2em]">Ingredients / 食材を入力</label>
+                    <input type="text" id="ingredientsInput" placeholder="例: 牛肉, トマト, マッシュルーム" oninput="toggleGenre()"
+                        class="w-full bg-white/5 border border-white/10 rounded-2xl px-8 py-5 text-white placeholder-gray-700 text-xl transition-all focus:bg-white/10 focus:border-white/30">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 mb-3 uppercase tracking-[0.2em]">Servings / 人数</label>
+                    <div class="relative">
+                        <select id="servingsInput" class="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-white text-xl appearance-none cursor-pointer focus:bg-white/10">
+                            <option value="1" class="bg-zinc-900">1人分</option>
+                            <option value="2" class="bg-zinc-900" selected>2人分</option>
+                            <option value="3" class="bg-zinc-900">3人分</option>
+                            <option value="4" class="bg-zinc-900">4人分</option>
+                        </select>
+                        <div class="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">▼</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="genreContainer" class="hidden mt-8 transition-all animate-in fade-in slide-in-from-top-2">
+                <label class="block text-[10px] font-bold text-gray-400 mb-3 uppercase tracking-[0.2em]">Cuisine Style / 料理スタイル</label>
+                <select id="genreInput" class="bg-white/5 border border-white/10 rounded-xl px-8 py-3 text-white appearance-none cursor-pointer focus:bg-white/10">
+                    <option value="特になし" class="bg-zinc-900">指定なし</option>
+                    <option value="和風" class="bg-zinc-900">和風</option>
+                    <option value="洋風" class="bg-zinc-900">洋風</option>
+                    <option value="中華" class="bg-zinc-900">中華</option>
+                    <option value="イタリアン" class="bg-zinc-900">イタリアン</option>
+                    <option value="ヘルシー" class="bg-zinc-900">ヘルシー</option>
+                </select>
+            </div>
+
+            <button onclick="startGeneration()" id="generateBtn"
+                class="w-full mt-10 bg-white text-black font-black text-sm uppercase tracking-[0.3em] py-6 rounded-2xl hover:bg-gray-200 transition-all active:scale-[0.98] disabled:opacity-20 shadow-xl shadow-white/5">
+                Generate 8 Recipes
+            </button>
+        </main>
+
+        <div id="loader" class="hidden text-center py-24">
+            <div class="loading-spinner mx-auto mb-8"></div>
+            <p id="statusLabel" class="text-white font-light tracking-[0.5em] text-[10px] uppercase animate-pulse">Consulting the Grand Chef...</p>
+        </div>
+
+        <div id="recipeGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-24"></div>
+
+        <footer class="text-center text-gray-600 text-[10px] tracking-widest uppercase pb-12">
+            &copy; Free Kitchen - AI Powered Gastronomy
+        </footer>
+    </div>
+
+    <script>
+        // APIキー設定（プレビュー環境用）
+        const API_KEY = ""; 
+
+        function toggleGenre() {
+            const val = document.getElementById('ingredientsInput').value;
+            const container = document.getElementById('genreContainer');
+            const keywords = ['肉', '牛', '豚', '鶏', 'ミンチ', 'ビーフ', 'ポーク', 'チキン', 'ステーキ'];
+            const hasMeat = keywords.some(k => val.includes(k));
+            container.classList.toggle('hidden', !hasMeat);
+        }
+
+        async function startGeneration() {
+            const input = document.getElementById('ingredientsInput').value;
+            const servings = document.getElementById('servingsInput').value;
+            const genre = document.getElementById('genreInput').value;
+            const isGenreVisible = !document.getElementById('genreContainer').classList.contains('hidden');
+
+            if (!input.trim()) return;
+
+            const grid = document.getElementById('recipeGrid');
+            const loader = document.getElementById('loader');
+            const btn = document.getElementById('generateBtn');
+
+            grid.innerHTML = '';
+            loader.classList.remove('hidden');
+            btn.disabled = true;
+
+            const styleNote = (isGenreVisible && genre !== "特になし") ? `特に「${genre}」のスタイルで提案してください。` : "";
+            const systemPrompt = `あなたは世界最高峰のミシュラン3つ星シェフです。${input}を使い、${servings}人分の創造的な料理を「8つ」提案してください。${styleNote}
+            レスポンスは必ず以下のJSON配列形式のみにしてください:
+            [
+              {
+                "title": "料理名",
+                "calories": "1人あたりの推定カロリー",
+                "ingredients": ["材料1", "材料2"],
+                "steps": ["手順1", "手順2"],
+                "imagePrompt": "Professional food photography of [dish name], gourmet plating, studio lighting"
+              }
+            ]`;
+
+            try {
+                const recipes = await callGeminiAPI(systemPrompt, `食材: ${input}`);
+                displayResults(recipes);
+            } catch (err) {
+                grid.innerHTML = `<div class="col-span-full text-center text-red-400 p-12 glass-card">Error: ${err.message}</div>`;
+            } finally {
+                loader.classList.add('hidden');
+                btn.disabled = false;
+                window.scrollTo({ top: grid.offsetTop - 80, behavior: 'smooth' });
+            }
+        }
+
+        async function callGeminiAPI(sys, user) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+            
+            for (let i = 0; i < 5; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: user }] }],
+                            systemInstruction: { parts: [{ text: sys }] },
+                            generationConfig: { responseMimeType: "application/json" }
+                        })
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                    const data = await response.json();
+                    return JSON.parse(data.candidates[0].content.parts[0].text);
+                } catch (e) {
+                    if (i === 4) throw e;
+                    await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+                }
+            }
+        }
+
+        async function generateFoodImage(prompt, elementId) {
+            const container = document.getElementById(elementId);
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${API_KEY}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instances: { prompt: `Top-down view of ${prompt}, exquisite plating, culinary art, high definition, professional lighting` },
+                        parameters: { sampleCount: 1 }
+                    })
+                });
+
+                const data = await response.json();
+                if (data.predictions && data.predictions[0]) {
+                    const base64 = data.predictions[0].bytesBase64Encoded;
+                    container.innerHTML = `<img src="data:image/png;base64,${base64}" class="w-full h-full object-cover transition-opacity duration-1000 opacity-0" onload="this.style.opacity=1">`;
+                }
+            } catch (e) {
+                container.innerHTML = `<span class="text-[8px] text-gray-700 uppercase">Preview N/A</span>`;
+            }
+        }
+
+        function displayResults(recipes) {
+            const grid = document.getElementById('recipeGrid');
+            grid.innerHTML = recipes.map((recipe, idx) => {
+                const imgId = `img-idx-${idx}`;
+                setTimeout(() => generateFoodImage(recipe.imagePrompt, imgId), idx * 300);
+
+                return `
+                <article class="glass-card p-8 recipe-card flex flex-col sm:flex-row gap-8 overflow-hidden">
+                    <div class="flex-1 min-w-0">
+                        <div class="mb-6">
+                            <span class="text-[9px] font-bold text-white/30 tracking-[0.3em] uppercase">${recipe.calories}</span>
+                            <h2 class="text-2xl font-bold text-white mt-2 leading-tight">${recipe.title}</h2>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <h3 class="text-[8px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Ingredients</h3>
+                            <div class="flex flex-wrap gap-x-4 gap-y-2 max-h-16 overflow-y-auto custom-scroll text-[11px] text-gray-300">
+                                ${recipe.ingredients.map(ing => `<span>/ ${ing}</span>`).join('')}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-[8px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Chef's Method</h3>
+                            <div class="max-h-32 overflow-y-auto custom-scroll pr-4">
+                                <ol class="text-[12px] text-gray-400 space-y-3">
+                                    ${recipe.steps.map((step, i) => `
+                                        <li class="flex gap-4">
+                                            <span class="text-white font-bold opacity-20 text-[10px] mt-0.5">${(i+1).toString().padStart(2, '0')}</span>
+                                            <span class="leading-relaxed">${step}</span>
+                                        </li>
+                                    `).join('')}
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="${imgId}" class="image-container shadow-2xl bg-black/40 ring-1 ring-white/5">
+                        <div class="loading-spinner opacity-20"></div>
+                    </div>
+                </article>
+                `;
+            }).join('');
+        }
+    </script>
+
+</body>
+
+
+
+
+
+
+
+
+
